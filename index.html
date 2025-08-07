@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>习惯养成树</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .header .actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .header button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .header button:hover {
+            background: #f0f0f0;
+        }
+        
+        .date-info {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .tree-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .habit-node {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .habit-node.level-1 { padding-left: 20px; }
+        .habit-node.level-2 { padding-left: 40px; }
+        .habit-node.level-3 { padding-left: 60px; }
+        .habit-node.level-4 { padding-left: 80px; }
+        .habit-node.level-5 { padding-left: 100px; }
+        
+        .habit-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .habit-name {
+            font-size: 16px;
+            color: #333;
+            flex-grow: 1;
+        }
+        
+        .streak {
+            color: #52c41a;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 2px 8px;
+            background: #f6ffed;
+            border-radius: 12px;
+        }
+        
+        .add-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #1890ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .add-btn:hover {
+            background: #40a9ff;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .modal-content h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .modal-content input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .modal-actions button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .modal-actions .confirm {
+            background: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+        
+        .modal-actions .confirm:hover {
+            background: #40a9ff;
+        }
+        
+        .modal-actions .cancel {
+            background: white;
+        }
+        
+        .modal-actions .cancel:hover {
+            background: #f0f0f0;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .warning {
+            background: #fff7e6;
+            border: 1px solid #ffd591;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            color: #d46b08;
+            display: none;
+        }
+        
+        .warning.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌳 习惯养成树</h1>
+        <div class="date-info" id="dateInfo"></div>
+        <div class="actions">
+            <button onclick="exportData()">导出数据</button>
+            <button onclick="importData()">导入数据</button>
+            <button onclick="resetToday()">重置今日</button>
+        </div>
+    </div>
+    
+    <div class="warning" id="warning"></div>
+    
+    <div class="tree-container">
+        <div id="treeContent"></div>
+    </div>
+    
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <h3>添加新习惯</h3>
+            <input type="text" id="newHabitName" placeholder="请输入习惯名称">
+            <div class="modal-actions">
+                <button class="cancel" onclick="closeModal()">取消</button>
+                <button class="confirm" onclick="confirmAddHabit()">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <input type="file" class="file-input" id="fileInput" accept=".json">
+    
+    <script>
+        // 数据存储键名
+        const STORAGE_KEY = 'habitTreeData';
+        
+        // 默认数据结构
+        const defaultData = {
+            root: {
+                id: 'root',
+                name: '我的习惯',
+                children: []
+            },
+            today: new Date().toISOString().split('T')[0],
+            checked: []
+        };
+        
+        // 全局变量
+        let data = loadData();
+        let addingParentId = null;
+        
+        // 加载数据
+        function loadData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    return JSON.parse(stored);
+                } catch (e) {
+                    console.error('数据加载失败', e);
+                    return defaultData;
+                }
+            }
+            return defaultData;
+        }
+        
+        // 保存数据
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+        
+        // 获取今天日期
+        function getToday() {
+            return new Date().toISOString().split('T')[0];
+        }
+        
+        // 获取昨天日期
+        function getYesterday() {
+            const date = new Date();
+            date.setDate(date.getDate() - 1);
+            return date.toISOString().split('T')[0];
+        }
+        
+        // 计算日期差
+        function daysDiff(date1, date2) {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            const diff = Math.abs(d2 - d1);
+            return Math.floor(diff / (1000 * 60 * 60 * 24));
+        }
+        
+        // 生成唯一ID
+        function generateId() {
+            return 'h' + Date.now() + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // 检查是否为叶子节点
+        function isLeaf(node) {
+            return !node.children || node.children.length === 0;
+        }
+        
+        // 递归查找节点
+        function findNode(node, id) {
+            if (node.id === id) return node;
+            if (node.children) {
+                for (let child of node.children) {
+                    const found = findNode(child, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        // 递归删除节点
+        function deleteNode(parent, nodeId) {
+            if (!parent.children) return false;
+            const index = parent.children.findIndex(child => child.id === nodeId);
+            if (index !== -1) {
+                parent.children.splice(index, 1);
+                return true;
+            }
+            for (let child of parent.children) {
+                if (deleteNode(child, nodeId)) return true;
+            }
+            return false;
+        }
+        
+        // 获取所有子节点ID
+        function getAllChildIds(node) {
+            let ids = [node.id];
+            if (node.children) {
+                for (let child of node.children) {
+                    ids = ids.concat(getAllChildIds(child));
+                }
+            }
+            return ids;
+        }
+        
+        // 检查并删除未完成的习惯
+        function checkAndDeleteUnfinished() {
+            const today = getToday();
+            const yesterday = getYesterday();
+            
+            // 如果不是新的一天，不处理
+            if (data.today === today) return [];
+            
+            let deletedHabits = [];
+            
+            // 递归检查每个习惯
+            function checkNode(node) {
+                if (node.id === 'root') {
+                    // 检查根节点的子节点
+                    let i = node.children.length - 1;
+                    while (i >= 0) {
+                        if (!checkNode(node.children[i])) {
+                            const deleted = node.children[i];
+                            deletedHabits.push(deleted.name);
+                            node.children.splice(i, 1);
+                        }
+                        i--;
+                    }
+                    return true;
+                }
+                
+                // 检查习惯是否昨天完成
+                if (node.lastCheck !== yesterday) {
+                    // 习惯未完成，需要删除
+                    return false;
+                }
+                
+                // 检查子节点
+                if (node.children) {
+                    let i = node.children.length - 1;
+                    while (i >= 0) {
+                        if (!checkNode(node.children[i])) {
+                            const deleted = node.children[i];
+                            deletedHabits.push(deleted.name);
+                            node.children.splice(i, 1);
+                        }
+                        i--;
+                    }
+                }
+                
+                return true;
+            }
+            
+            checkNode(data.root);
+            
+            // 更新日期和清空今日打卡
+            data.today = today;
+            data.checked = [];
+            
+            return deletedHabits;
+        }
+        
+        // 渲染习惯树
+        function renderTree() {
+            const container = document.getElementById('treeContent');
+            
+            if (!data.root.children || data.root.children.length === 0) {
+                container.innerHTML = '<div class="empty-state">还没有习惯，点击下方按钮添加第一个习惯<br><br><button class="add-btn" onclick="showAddModal(\'root\')">添加习惯</button></div>';
+                return;
+            }
+            
+            let html = '';
+            
+            function renderNode(node, level = 0) {
+                if (node.id === 'root') {
+                    html += `<div class="habit-node level-0">
+                        <span class="habit-name" style="font-weight: bold;">📚 ${node.name}</span>
+                    </div>`;
+                    if (node.children) {
+                        for (let child of node.children) {
+                            renderNode(child, level + 1);
+                        }
+                    }
+                } else {
+                    const isChecked = data.checked.includes(node.id);
+                    const streakText = node.streak > 0 ? `${node.streak}天` : '新习惯';
+                    
+                    html += `<div class="habit-node level-${level}">
+                        <input type="checkbox" class="habit-checkbox" 
+                               id="check-${node.id}" 
+                               ${isChecked ? 'checked' : ''}
+                               onchange="toggleHabit('${node.id}')">
+                        <label for="check-${node.id}" class="habit-name">${node.name}</label>
+                        <span class="streak">${streakText}</span>
+                        ${isLeaf(node) ? `<button class="add-btn" onclick="showAddModal('${node.id}')">+</button>` : ''}
+                    </div>`;
+                    
+                    if (node.children) {
+                        for (let child of node.children) {
+                            renderNode(child, level + 1);
+                        }
+                    }
+                }
+            }
+            
+            renderNode(data.root);
+            
+            // 如果根节点没有子节点或所有子节点都是叶子，也在根节点显示添加按钮
+            const allLeaves = !data.root.children || data.root.children.every(child => isLeaf(child));
+            if (allLeaves) {
+                html += `<div class="habit-node level-1">
+                    <button class="add-btn" onclick="showAddModal('root')">添加新习惯</button>
+                </div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // 切换习惯状态
+        function toggleHabit(habitId) {
+            const checkbox = document.getElementById(`check-${habitId}`);
+            const node = findNode(data.root, habitId);
+            
+            if (!node) return;
+            
+            const today = getToday();
+            
+            if (checkbox.checked) {
+                // 打卡
+                if (!data.checked.includes(habitId)) {
+                    data.checked.push(habitId);
+                }
+                
+                // 更新连续天数
+                if (node.lastCheck) {
+                    const diff = daysDiff(node.lastCheck, today);
+                    if (diff === 1) {
+                        // 连续打卡
+                        node.streak = (node.streak || 0) + 1;
+                    } else if (diff === 0) {
+                        // 今天已打卡，不增加
+                    } else {
+                        // 中断了，重新开始
+                        node.streak = 1;
+                    }
+                } else {
+                    // 第一次打卡
+                    node.streak = 1;
+                }
+                
+                node.lastCheck = today;
+                
+                // 自动勾选所有父节点
+                checkParents(habitId);
+            } else {
+                // 取消打卡
+                const index = data.checked.indexOf(habitId);
+                if (index > -1) {
+                    data.checked.splice(index, 1);
+                }
+                
+                // 如果今天刚打的卡，减少连续天数
+                if (node.lastCheck === today && node.streak > 0) {
+                    node.streak--;
+                    if (node.streak === 0) {
+                        node.lastCheck = null;
+                    } else {
+                        // 恢复到昨天的日期
+                        const date = new Date();
+                        date.setDate(date.getDate() - 1);
+                        node.lastCheck = date.toISOString().split('T')[0];
+                    }
+                }
+                
+                // 自动取消所有子节点
+                uncheckChildren(habitId);
+            }
+            
+            saveData();
+            renderTree();
+        }
+        
+        // 自动勾选父节点
+        function checkParents(nodeId) {
+            function findParent(parent, targetId) {
+                if (parent.children) {
+                    for (let child of parent.children) {
+                        if (child.id === targetId) {
+                            return parent;
+                        }
+                        const found = findParent(child, targetId);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            
+            const parent = findParent(data.root, nodeId);
+            if (parent && parent.id !== 'root') {
+                if (!data.checked.includes(parent.id)) {
+                    data.checked.push(parent.id);
+                    
+                    // 更新父节点的streak
+                    const today = getToday();
+                    const node = findNode(data.root, parent.id);
+                    if (node) {
+                        if (node.lastCheck) {
+                            const diff = daysDiff(node.lastCheck, today);
+                            if (diff === 1) {
+                                node.streak = (node.streak || 0) + 1;
+                            } else if (diff === 0) {
+                                // 今天已打卡
+                            } else {
+                                node.streak = 1;
+                            }
+                        } else {
+                            node.streak = 1;
+                        }
+                        node.lastCheck = today;
+                    }
+                }
+                checkParents(parent.id);
+            }
+        }
+        
+        // 自动取消子节点
+        function uncheckChildren(nodeId) {
+            const node = findNode(data.root, nodeId);
+            if (!node || !node.children) return;
+            
+            for (let child of node.children) {
+                const index = data.checked.indexOf(child.id);
+                if (index > -1) {
+                    data.checked.splice(index, 1);
+                }
+                
+                // 更新子节点的streak
+                const today = getToday();
+                if (child.lastCheck === today && child.streak > 0) {
+                    child.streak--;
+                    if (child.streak === 0) {
+                        child.lastCheck = null;
+                    } else {
+                        const date = new Date();
+                        date.setDate(date.getDate() - 1);
+                        child.lastCheck = date.toISOString().split('T')[0];
+                    }
+                }
+                
+                uncheckChildren(child.id);
+            }
+        }
+        
+        // 显示添加习惯弹窗
+        function showAddModal(parentId) {
+            addingParentId = parentId;
+            document.getElementById('addModal').classList.add('show');
+            document.getElementById('newHabitName').value = '';
+            document.getElementById('newHabitName').focus();
+        }
+        
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('addModal').classList.remove('show');
+            addingParentId = null;
+        }
+        
+        // 确认添加习惯
+        function confirmAddHabit() {
+            const name = document.getElementById('newHabitName').value.trim();
+            if (!name) {
+                alert('请输入习惯名称');
+                return;
+            }
+            
+            const parent = findNode(data.root, addingParentId);
+            if (!parent) {
+                alert('添加失败：找不到父节点');
+                return;
+            }
+            
+            if (!parent.children) {
+                parent.children = [];
+            }
+            
+            const newHabit = {
+                id: generateId(),
+                name: name,
+                streak: 0,
+                lastCheck: null,
+                children: []
+            };
+            
+            parent.children.push(newHabit);
+            
+            saveData();
+            renderTree();
+            closeModal();
+        }
+        
+        // 导出数据
+        function exportData() {
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `habit-tree-${getToday()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // 导入数据
+        function importData() {
+            const input = document.getElementById('fileInput');
+            input.click();
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const imported = JSON.parse(event.target.result);
+                        if (imported.root) {
+                            if (confirm('导入数据将覆盖现有数据，是否继续？')) {
+                                data = imported;
+                                saveData();
+                                renderTree();
+                                updateDateInfo();
+                                alert('导入成功');
+                            }
+                        } else {
+                            alert('无效的数据格式');
+                        }
+                    } catch (e) {
+                        alert('导入失败：' + e.message);
+                    }
+                };
+                reader.readAsText(file);
+                input.value = '';
+            };
+        }
+        
+        // 重置今日
+        function resetToday() {
+            if (confirm('确定要清空今日的所有打卡记录吗？')) {
+                data.checked = [];
+                // 重置所有习惯的今日打卡状态
+                function resetNode(node) {
+                    if (node.id !== 'root' && node.lastCheck === getToday()) {
+                        if (node.streak > 0) {
+                            node.streak--;
+                        }
+                        if (node.streak === 0) {
+                            node.lastCheck = null;
+                        } else {
+                            const date = new Date();
+                            date.setDate(date.getDate() - 1);
+                            node.lastCheck = date.toISOString().split('T')[0];
+                        }
+                    }
+                    if (node.children) {
+                        for (let child of node.children) {
+                            resetNode(child);
+                        }
+                    }
+                }
+                resetNode(data.root);
+                saveData();
+                renderTree();
+            }
+        }
+        
+        // 更新日期信息
+        function updateDateInfo() {
+            const today = getToday();
+            const dateStr = new Date().toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            });
+            document.getElementById('dateInfo').textContent = `今天：${dateStr}`;
+        }
+        
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            // ESC关闭弹窗
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+            // 在弹窗中按Enter确认
+            if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('show')) {
+                confirmAddHabit();
+            }
+        });
+        
+        // 初始化
+        function init() {
+            updateDateInfo();
+            
+            // 检查并删除未完成的习惯
+            const deleted = checkAndDeleteUnfinished();
+            if (deleted.length > 0) {
+                const warning = document.getElementById('warning');
+                warning.textContent = `⚠️ 由于昨日未完成，以下习惯分支已被删除：${deleted.join('、')}`;
+                warning.classList.add('show');
+                setTimeout(() => {
+                    warning.classList.remove('show');
+                }, 5000);
+            }
+            
+            saveData();
+            renderTree();
+            
+            // 每分钟检查日期变化
+            setInterval(() => {
+                const currentDate = getToday();
+                if (data.today !== currentDate) {
+                    location.reload();
+                }
+            }, 60000);
+        }
+        
+        // 启动应用
+        init();
+    </script>
+</body>
+</html>

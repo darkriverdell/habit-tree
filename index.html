@@ -187,6 +187,139 @@
             display: none;
         }
         
+        .definition-icon {
+            cursor: pointer;
+            font-size: 12px;
+            color: #1890ff;
+            margin-left: 4px;
+            padding: 2px 6px;
+            background: #e6f7ff;
+            border-radius: 10px;
+            border: 1px solid #91d5ff;
+        }
+        
+        .definition-icon:hover {
+            background: #bae7ff;
+        }
+        
+        .definition-icon.has-definition {
+            background: #f6ffed;
+            border-color: #b7eb8f;
+            color: #52c41a;
+        }
+        
+        .definition-modal textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            min-height: 150px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        .definition-preview {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .definitions-panel {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100%;
+            background: white;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            transition: right 0.3s ease;
+            z-index: 999;
+            overflow-y: auto;
+        }
+        
+        .definitions-panel.show {
+            right: 0;
+        }
+        
+        .definitions-panel-header {
+            padding: 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
+        }
+        
+        .definitions-panel-header h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .definitions-panel-close {
+            cursor: pointer;
+            font-size: 20px;
+            color: #999;
+            padding: 0 8px;
+        }
+        
+        .definitions-panel-content {
+            padding: 20px;
+        }
+        
+        .definition-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 6px;
+            border: 1px solid #e8e8e8;
+        }
+        
+        .definition-item-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .definition-item-text {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .definition-item-edit {
+            cursor: pointer;
+            color: #1890ff;
+            font-size: 12px;
+            padding: 2px 8px;
+            background: #e6f7ff;
+            border-radius: 4px;
+        }
+        
+        .definition-item-edit:hover {
+            background: #bae7ff;
+        }
+        
+        .no-definitions {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+        
         .empty-state {
             text-align: center;
             padding: 40px;
@@ -216,6 +349,7 @@
             <button onclick="exportData()">导出数据</button>
             <button onclick="importData()">导入数据</button>
             <button onclick="resetToday()">重置今日</button>
+            <button onclick="showDefinitionsPanel()">查看定义</button>
         </div>
     </div>
     
@@ -236,6 +370,31 @@
         </div>
     </div>
     
+    <div class="modal" id="definitionModal">
+        <div class="modal-content">
+            <h3 id="definitionModalTitle">编辑定义</h3>
+            <div id="definitionPreview" class="definition-preview" style="display: none;"></div>
+            <textarea id="definitionText" placeholder="输入习惯的详细定义...
+例如：
+- 具体要求：每天至少运动30分钟
+- 包括内容：跑步、游泳、健身等
+- 不包括：散步、做家务
+- 特殊说明：如遇恶劣天气可改为室内运动"></textarea>
+            <div class="modal-actions">
+                <button class="cancel" onclick="closeDefinitionModal()">取消</button>
+                <button class="confirm" onclick="saveDefinition()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="definitions-panel" id="definitionsPanel">
+        <div class="definitions-panel-header">
+            <h3>习惯定义列表</h3>
+            <span class="definitions-panel-close" onclick="hideDefinitionsPanel()">✕</span>
+        </div>
+        <div class="definitions-panel-content" id="definitionsPanelContent"></div>
+    </div>
+    
     <input type="file" class="file-input" id="fileInput" accept=".json">
     
     <script>
@@ -250,19 +409,26 @@
                 children: []
             },
             today: new Date().toISOString().split('T')[0],
-            checked: []
+            checked: [],
+            definitions: {}  // 存储习惯定义
         };
         
         // 全局变量
         let data = loadData();
         let addingParentId = null;
+        let editingDefinitionId = null;
         
         // 加载数据
         function loadData() {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) {
                 try {
-                    return JSON.parse(stored);
+                    const parsed = JSON.parse(stored);
+                    // 确保definitions存在
+                    if (!parsed.definitions) {
+                        parsed.definitions = {};
+                    }
+                    return parsed;
                 } catch (e) {
                     console.error('数据加载失败', e);
                     return defaultData;
@@ -424,6 +590,7 @@
                 } else {
                     const isChecked = data.checked.includes(node.id);
                     const streakText = node.streak > 0 ? `${node.streak}天` : '新习惯';
+                    const hasDefinition = data.definitions && data.definitions[node.id];
                     
                     html += `<div class="habit-node level-${level}">
                         <input type="checkbox" class="habit-checkbox" 
@@ -431,6 +598,11 @@
                                ${isChecked ? 'checked' : ''}
                                onchange="toggleHabit('${node.id}')">
                         <label for="check-${node.id}" class="habit-name">${node.name}</label>
+                        <span class="definition-icon ${hasDefinition ? 'has-definition' : ''}" 
+                              onclick="openDefinitionModal('${node.id}')" 
+                              title="${hasDefinition ? '查看/编辑定义' : '添加定义'}">
+                            ${hasDefinition ? '📝' : '➕'}
+                        </span>
                         <span class="streak">${streakText}</span>
                         ${isLeaf(node) ? `<button class="add-btn" onclick="showAddModal('${node.id}')">+</button>` : ''}
                     </div>`;
@@ -724,13 +896,124 @@
             document.getElementById('dateInfo').textContent = `今天：${dateStr}`;
         }
         
+        // 打开定义编辑弹窗
+        function openDefinitionModal(habitId) {
+            editingDefinitionId = habitId;
+            const node = findNode(data.root, habitId);
+            const modal = document.getElementById('definitionModal');
+            const preview = document.getElementById('definitionPreview');
+            const textarea = document.getElementById('definitionText');
+            const title = document.getElementById('definitionModalTitle');
+            
+            if (!node) return;
+            
+            title.textContent = `编辑定义 - ${node.name}`;
+            
+            const existingDefinition = data.definitions && data.definitions[habitId];
+            if (existingDefinition) {
+                textarea.value = existingDefinition;
+                preview.textContent = existingDefinition;
+                preview.style.display = 'block';
+            } else {
+                textarea.value = '';
+                preview.style.display = 'none';
+            }
+            
+            modal.classList.add('show');
+            textarea.focus();
+        }
+        
+        // 关闭定义弹窗
+        function closeDefinitionModal() {
+            document.getElementById('definitionModal').classList.remove('show');
+            editingDefinitionId = null;
+        }
+        
+        // 保存定义
+        function saveDefinition() {
+            if (!editingDefinitionId) return;
+            
+            const textarea = document.getElementById('definitionText');
+            const definition = textarea.value.trim();
+            
+            if (!data.definitions) {
+                data.definitions = {};
+            }
+            
+            if (definition) {
+                data.definitions[editingDefinitionId] = definition;
+            } else {
+                // 如果定义为空，删除该定义
+                delete data.definitions[editingDefinitionId];
+            }
+            
+            saveData();
+            renderTree();
+            closeDefinitionModal();
+            updateDefinitionsPanel();
+        }
+        
+        // 显示定义面板
+        function showDefinitionsPanel() {
+            const panel = document.getElementById('definitionsPanel');
+            panel.classList.add('show');
+            updateDefinitionsPanel();
+        }
+        
+        // 隐藏定义面板
+        function hideDefinitionsPanel() {
+            document.getElementById('definitionsPanel').classList.remove('show');
+        }
+        
+        // 更新定义面板内容
+        function updateDefinitionsPanel() {
+            const content = document.getElementById('definitionsPanelContent');
+            
+            if (!data.definitions || Object.keys(data.definitions).length === 0) {
+                content.innerHTML = '<div class="no-definitions">暂无定义的习惯</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            // 递归收集所有有定义的习惯
+            function collectDefinitions(node) {
+                if (node.id !== 'root' && data.definitions[node.id]) {
+                    html += `
+                        <div class="definition-item">
+                            <div class="definition-item-title">
+                                <span>${node.name}</span>
+                                <span class="definition-item-edit" onclick="openDefinitionModal('${node.id}')">编辑</span>
+                            </div>
+                            <div class="definition-item-text">${data.definitions[node.id]}</div>
+                        </div>
+                    `;
+                }
+                if (node.children) {
+                    for (let child of node.children) {
+                        collectDefinitions(child);
+                    }
+                }
+            }
+            
+            collectDefinitions(data.root);
+            
+            if (html === '') {
+                content.innerHTML = '<div class="no-definitions">暂无定义的习惯</div>';
+            } else {
+                content.innerHTML = html;
+            }
+        }
+        
         // 键盘快捷键
         document.addEventListener('keydown', function(e) {
             // ESC关闭弹窗
             if (e.key === 'Escape') {
                 closeModal();
+                closeDefinitionModal();
+                hideDefinitionsPanel();
             }
-            // 在弹窗中按Enter确认
+            // 在添加习惯弹窗中按Enter确认
             if (e.key === 'Enter' && document.getElementById('addModal').classList.contains('show')) {
                 confirmAddHabit();
             }
